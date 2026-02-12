@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Systeme de Chat</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+
+  <body>
+    <h1>Systeme de Chat</h1>
+
+    <div id="pseudoBloc">
+      <div id="pseudoAffichage"></div>
+      <button id="changerPseudo" onclick="ouvrirPopupPseudo()">
+        Changer de pseudo
+      </button>
+    </div>
+
+    <div id="zoneChat">
+      <div id="messages"></div>
+      <div id="envoiMessage">
+        <input type="text" id="inputMessage" placeholder="Écrivez votre message...">
+        <button onclick="envoyerMessage()">Envoyer</button>
+      </div>
+    </div>
+
+    <div id="popup">
+      <div id="popup-content">
+        <h2>Entrez votre pseudo</h2>
+        <input type="text" id="monInput" placeholder="Votre pseudo">
+        <br><br>
+        <button onclick="validerPseudo()">Valider</button>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
