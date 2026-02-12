@@ -1,4 +1,6 @@
 let socket;
+let mediaRecorder = null;
+let chunksVocal = [];
 
 window.onload = function () {
   const pseudo = localStorage.getItem("pseudo");
@@ -106,11 +108,66 @@ async function envoyerMessage() {
   }
 }
 
+function toggleVocal() {
+  const btn = document.getElementById("btnVocal");
+  if (!btn) return;
+
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    btn.textContent = "Vocal";
+    btn.classList.remove("recording");
+    return;
+  }
+
+  const pseudo = localStorage.getItem("pseudo");
+  if (!pseudo) {
+    alert("Veuillez d'abord entrer votre pseudo !");
+    return;
+  }
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    alert("Connexion au chat non disponible.");
+    return;
+  }
+
+  navigator.mediaDevices
+    .getUserMedia({ audio: true })
+    .then((stream) => {
+      chunksVocal = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksVocal.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksVocal, { type: "audio/webm" });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result.split(",")[1];
+          if (base64) {
+            socket.send(JSON.stringify({ pseudo, audio: base64 }));
+          }
+        };
+        reader.readAsDataURL(blob);
+      };
+      mediaRecorder.start();
+      btn.textContent = "Arrêter";
+      btn.classList.add("recording");
+    })
+    .catch((err) => {
+      console.error("Micro non disponible", err);
+      alert("Accès au micro refusé ou non disponible.");
+    });
+}
+
 function afficherListeMessages(liste) {
   const zone = document.getElementById("messages");
   zone.innerHTML = "";
   for (const msg of liste) {
-    ajouterMessage(msg.pseudo, msg.texte);
+    if (msg.audio) {
+      ajouterMessageVocal(msg.pseudo, msg.audio);
+    } else {
+      ajouterMessage(msg.pseudo, msg.texte || "");
+    }
   }
 }
 
@@ -128,6 +185,33 @@ function ajouterMessage(pseudo, texte) {
 
   div.innerHTML =
     '<span class="auteur">' + pseudo + "</span><br>" + escapeHtml(texte);
+  zone.appendChild(div);
+  zone.scrollTop = zone.scrollHeight;
+}
+
+function ajouterMessageVocal(pseudo, audioBase64) {
+  const zone = document.getElementById("messages");
+  const div = document.createElement("div");
+  div.className = "message message-vocal";
+
+  const pseudoLocal = localStorage.getItem("pseudo");
+  if (pseudoLocal && pseudo === pseudoLocal) {
+    div.classList.add("message-me");
+  } else {
+    div.classList.add("message-other");
+  }
+
+  const span = document.createElement("span");
+  span.className = "auteur";
+  span.textContent = pseudo;
+  div.appendChild(span);
+  div.appendChild(document.createElement("br"));
+
+  const audio = document.createElement("audio");
+  audio.controls = true;
+  audio.preload = "metadata";
+  audio.src = "data:audio/webm;base64," + audioBase64;
+  div.appendChild(audio);
   zone.appendChild(div);
   zone.scrollTop = zone.scrollHeight;
 }
@@ -155,7 +239,12 @@ function connecterWebSocket() {
       if (data.type === "history" && Array.isArray(data.messages)) {
         afficherListeMessages(data.messages);
       } else if (data.type === "message" && data.message) {
-        ajouterMessage(data.message.pseudo, data.message.texte);
+        const msg = data.message;
+        if (msg.audio) {
+          ajouterMessageVocal(msg.pseudo, msg.audio);
+        } else {
+          ajouterMessage(msg.pseudo, msg.texte || "");
+        }
       }
     } catch (e) {
       console.error("Erreur lors du traitement d'un message WebSocket", e);
