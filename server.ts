@@ -1,7 +1,8 @@
 type Message = {
   id: number;
   pseudo: string;
-  texte: string;
+  texte?: string;
+  audio?: string;
 };
 
 const messages: Message[] = [];
@@ -99,22 +100,27 @@ const server = Bun.serve({
         const payload = JSON.parse(String(data)) as {
           pseudo?: string;
           texte?: string;
+          audio?: string;
         };
 
         const pseudo =
           typeof payload.pseudo === "string" ? payload.pseudo : "Inconnu";
-        const texte =
-          typeof payload.texte === "string" ? payload.texte : "";
 
         const message: Message = {
           id: nextId++,
           pseudo,
-          texte,
         };
 
-        messages.push(message);
+        if (typeof payload.audio === "string" && payload.audio.length > 0) {
+          message.audio = payload.audio;
+          console.log(`[WS VOCAL] ${pseudo}`);
+        } else {
+          message.texte =
+            typeof payload.texte === "string" ? payload.texte : "";
+          console.log(`[WS MESSAGE] ${pseudo}: ${message.texte}`);
+        }
 
-        console.log(`[WS MESSAGE] ${pseudo}: ${texte}`);
+        messages.push(message);
 
         server.publish(
           "chat",

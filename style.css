@@ -142,3 +142,29 @@ h1 {
 #envoiMessage button:hover {
   background: #1d4ed8;
 }
+
+#envoiMessage #btnVocal {
+  background: #16a34a;
+}
+
+#envoiMessage #btnVocal:hover {
+  background: #15803d;
+}
+
+#envoiMessage #btnVocal.recording {
+  background: #dc2626;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.8;
+  }
+}
+
+#messages .message-vocal audio {
+  display: block;
+  margin-top: 4px;
+  max-width: 100%;
+  min-width: 200px;
+}
