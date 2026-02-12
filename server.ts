@@ -3,6 +3,8 @@ type Message = {
   pseudo: string;
   texte?: string;
   audio?: string;
+  system?: boolean;
+  oldPseudo?: string;
 };
 
 const messages: Message[] = [];
@@ -98,36 +100,84 @@ const server = Bun.serve({
     message(ws, data) {
       try {
         const payload = JSON.parse(String(data)) as {
+          type?: string;
           pseudo?: string;
+          oldPseudo?: string;
+          newPseudo?: string;
           texte?: string;
           audio?: string;
         };
 
+        if (payload.type === "changePseudo" && typeof payload.newPseudo === "string" && typeof payload.oldPseudo === "string") {
+          const oldPseudo = payload.oldPseudo.trim();
+          const newPseudo = payload.newPseudo.trim() || "Inconnu";
+          const message: Message = {
+            id: nextId++,
+            pseudo: newPseudo,
+            oldPseudo,
+            texte: oldPseudo + " a modifié son pseudo en " + newPseudo,
+            system: true,
+          };
+          messages.push(message);
+          pseudos.delete(oldPseudo);
+          pseudos.add(newPseudo);
+          console.log(`[CHANGE PSEUDO] ${oldPseudo} → ${newPseudo}`);
+          server.publish(
+            "chat",
+            JSON.stringify({ type: "message", message }),
+          );
+          return;
+        }
+
+        if (payload.type === "join" && typeof payload.pseudo === "string") {
+          const pseudo = payload.pseudo.trim() || "Inconnu";
+          const message: Message = {
+            id: nextId++,
+            pseudo,
+            texte: pseudo + " a rejoint",
+            system: true,
+          };
+          messages.push(message);
+          console.log(`[JOIN] ${pseudo}`);
+          server.publish(
+            "chat",
+            JSON.stringify({ type: "message", message }),
+          );
+          return;
+        }
+
         const pseudo =
           typeof payload.pseudo === "string" ? payload.pseudo : "Inconnu";
 
+        if (typeof payload.audio === "string" && payload.audio.length > 0) {
+          const message: Message = {
+            id: nextId++,
+            pseudo,
+            audio: payload.audio,
+          };
+          messages.push(message);
+          console.log(`[WS VOCAL] ${pseudo}`);
+          server.publish(
+            "chat",
+            JSON.stringify({ type: "message", message }),
+          );
+          return;
+        }
+
+        const texte = typeof payload.texte === "string" ? payload.texte : "";
         const message: Message = {
           id: nextId++,
           pseudo,
+          texte
         };
 
-        if (typeof payload.audio === "string" && payload.audio.length > 0) {
-          message.audio = payload.audio;
-          console.log(`[WS VOCAL] ${pseudo}`);
-        } else {
-          message.texte =
-            typeof payload.texte === "string" ? payload.texte : "";
-          console.log(`[WS MESSAGE] ${pseudo}: ${message.texte}`);
-        }
 
+        console.log(`[WS MESSAGE] ${pseudo}: ${message.texte}`);
         messages.push(message);
 
         server.publish(
           "chat",
-          JSON.stringify({
-            type: "message",
-            message,
-          }),
+          JSON.stringify({ type: "message", message }),
         );
       } catch (e) {
         console.error("Erreur WebSocket message:", e);
