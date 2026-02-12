@@ -6,6 +6,7 @@ type Message = {
 
 const messages: Message[] = [];
 let nextId = 1;
+const pseudos = new Set<string>();
 
 const server = Bun.serve({
   port: 3000,
@@ -32,10 +33,31 @@ const server = Bun.serve({
         texte,
       };
       messages.push(message);
+      if (pseudo !== "Inconnu") {
+        pseudos.add(pseudo);
+      }
 
       console.log(`[MESSAGE] ${pseudo}: ${texte}`);
 
       return new Response("Message reçu par le serveur");
+    }
+
+    if (url.pathname === "/check-pseudo" && req.method === "GET") {
+      const pseudo = url.searchParams.get("pseudo") ?? "";
+      const exists = pseudos.has(pseudo);
+
+      if (!exists && pseudo.trim() !== "") {
+        pseudos.add(pseudo);
+      }
+
+      return new Response(
+        JSON.stringify({
+          available: !exists,
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     if (url.pathname === "/messages" && req.method === "GET") {

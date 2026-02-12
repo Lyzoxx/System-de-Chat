@@ -19,13 +19,42 @@ window.onload = function () {
   }
 };
 
-function validerPseudo() {
+async function validerPseudo() {
   const input = document.getElementById("monInput");
+  const errorEl = document.getElementById("pseudoError");
   const pseudo = input.value;
 
+  if (errorEl) {
+    errorEl.textContent = "";
+  }
+
   if (pseudo.trim() === "") {
-    alert("Veuillez entrer un pseudo !");
+    if (errorEl) {
+      errorEl.textContent = "Veuillez entrer un pseudo.";
+    } else {
+      alert("Veuillez entrer un pseudo !");
+    }
     return;
+  }
+
+  try {
+    const response = await fetch(
+      "/check-pseudo?pseudo=" + encodeURIComponent(pseudo),
+    );
+    if (response.ok) {
+      const data = await response.json();
+      if (!data.available) {
+        if (errorEl) {
+          errorEl.textContent =
+            "Ce pseudo est déjà utilisé, choisis-en un autre.";
+        } else {
+          alert("Ce pseudo est déjà utilisé, choisis-en un autre.");
+        }
+        return;
+      }
+    }
+  } catch (e) {
+    console.error("Erreur lors de la vérification du pseudo", e);
   }
 
   localStorage.setItem("pseudo", pseudo);
@@ -89,6 +118,14 @@ function ajouterMessage(pseudo, texte) {
   const zone = document.getElementById("messages");
   const div = document.createElement("div");
   div.className = "message";
+
+  const pseudoLocal = localStorage.getItem("pseudo");
+  if (pseudoLocal && pseudo === pseudoLocal) {
+    div.classList.add("message-me");
+  } else {
+    div.classList.add("message-other");
+  }
+
   div.innerHTML =
     '<span class="auteur">' + pseudo + "</span><br>" + escapeHtml(texte);
   zone.appendChild(div);
