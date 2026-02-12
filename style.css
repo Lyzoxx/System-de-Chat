@@ -113,6 +113,15 @@ h1 {
   margin-bottom: 4px;
 }
 
+#messages .message-system {
+  align-self: center;
+  background: transparent;
+  color: #555;
+  font-size: 13px;
+  font-style: italic;
+  margin: 6px 0;
+}
+
 #envoiMessage {
   display: flex;
   padding: 12px;

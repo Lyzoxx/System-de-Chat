@@ -59,11 +59,20 @@ async function validerPseudo() {
     console.error("Erreur lors de la vérification du pseudo", e);
   }
 
+  const oldPseudo = localStorage.getItem("pseudo");
   localStorage.setItem("pseudo", pseudo);
 
   afficherPseudo(pseudo);
 
   document.getElementById("popup").style.display = "none";
+
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    if (oldPseudo && oldPseudo !== pseudo) {
+      socket.send(JSON.stringify({ type: "changePseudo", oldPseudo, newPseudo: pseudo }));
+    } else {
+      socket.send(JSON.stringify({ type: "join", pseudo }));
+    }
+  }
 }
 
 function afficherPseudo(pseudo) {
@@ -163,12 +172,36 @@ function afficherListeMessages(liste) {
   const zone = document.getElementById("messages");
   zone.innerHTML = "";
   for (const msg of liste) {
-    if (msg.audio) {
+    if (msg.system) {
+      ajouterMessageSystem(msg);
+    } else if (msg.audio) {
       ajouterMessageVocal(msg.pseudo, msg.audio);
     } else {
       ajouterMessage(msg.pseudo, msg.texte || "");
     }
   }
+}
+
+function ajouterMessageSystem(msg) {
+  const zone = document.getElementById("messages");
+  const div = document.createElement("div");
+  div.className = "message message-system";
+  const pseudoLocal = localStorage.getItem("pseudo");
+  if (msg.oldPseudo != null) {
+    if (pseudoLocal && msg.pseudo === pseudoLocal) {
+      div.textContent = "Vous avez modifié votre pseudo en " + msg.pseudo;
+    } else {
+      div.textContent = msg.texte;
+    }
+  } else {
+    if (pseudoLocal && msg.pseudo === pseudoLocal) {
+      div.textContent = "Vous avez rejoint le Chat";
+    } else {
+      div.textContent = msg.texte;
+    }
+  }
+  zone.appendChild(div);
+  zone.scrollTop = zone.scrollHeight;
 }
 
 function ajouterMessage(pseudo, texte) {
@@ -230,6 +263,10 @@ function connecterWebSocket() {
 
   socket.onopen = function () {
     console.log("Connecté au serveur de chat (WebSocket).");
+    const pseudo = localStorage.getItem("pseudo");
+    if (pseudo) {
+      socket.send(JSON.stringify({ type: "join", pseudo }));
+    }
   };
 
   socket.onmessage = function (event) {
@@ -240,7 +277,9 @@ function connecterWebSocket() {
         afficherListeMessages(data.messages);
       } else if (data.type === "message" && data.message) {
         const msg = data.message;
-        if (msg.audio) {
+        if (msg.system) {
+          ajouterMessageSystem(msg);
+        } else if (msg.audio) {
           ajouterMessageVocal(msg.pseudo, msg.audio);
         } else {
           ajouterMessage(msg.pseudo, msg.texte || "");
