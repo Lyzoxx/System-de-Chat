@@ -175,9 +175,9 @@ function afficherListeMessages(liste) {
     if (msg.system) {
       ajouterMessageSystem(msg);
     } else if (msg.audio) {
-      ajouterMessageVocal(msg.pseudo, msg.audio);
+      ajouterMessageVocal(msg.pseudo, msg.audio, msg.date);
     } else {
-      ajouterMessage(msg.pseudo, msg.texte || "");
+      ajouterMessage(msg.pseudo, msg.texte || "", msg.date);
     }
   }
 }
@@ -187,24 +187,27 @@ function ajouterMessageSystem(msg) {
   const div = document.createElement("div");
   div.className = "message message-system";
   const pseudoLocal = localStorage.getItem("pseudo");
+  let texte;
   if (msg.oldPseudo != null) {
     if (pseudoLocal && msg.pseudo === pseudoLocal) {
-      div.textContent = "Vous avez modifié votre pseudo en " + msg.pseudo;
+      texte = "Vous avez modifié votre pseudo en " + msg.pseudo;
     } else {
-      div.textContent = msg.texte;
+      texte = msg.texte;
     }
   } else {
     if (pseudoLocal && msg.pseudo === pseudoLocal) {
-      div.textContent = "Vous avez rejoint le Chat";
+      texte = "Vous avez rejoint le Chat";
     } else {
-      div.textContent = msg.texte;
+      texte = msg.texte;
     }
   }
+  const heure = formaterHeureFrance(msg.date);
+  div.innerHTML = escapeHtml(texte) + (heure ? ' <span class="heure">' + heure + "</span>" : "");
   zone.appendChild(div);
   zone.scrollTop = zone.scrollHeight;
 }
 
-function ajouterMessage(pseudo, texte) {
+function ajouterMessage(pseudo, texte, date) {
   const zone = document.getElementById("messages");
   const div = document.createElement("div");
   div.className = "message";
@@ -216,13 +219,15 @@ function ajouterMessage(pseudo, texte) {
     div.classList.add("message-other");
   }
 
+  const heure = formaterHeureFrance(date);
+  const heureHtml = heure ? ' <span class="heure">' + heure + "</span>" : "";
   div.innerHTML =
-    '<span class="auteur">' + pseudo + "</span><br>" + escapeHtml(texte);
+    '<span class="auteur">' + pseudo + heureHtml + "</span><br>" + escapeHtml(texte);
   zone.appendChild(div);
   zone.scrollTop = zone.scrollHeight;
 }
 
-function ajouterMessageVocal(pseudo, audioBase64) {
+function ajouterMessageVocal(pseudo, audioBase64, date) {
   const zone = document.getElementById("messages");
   const div = document.createElement("div");
   div.className = "message message-vocal";
@@ -238,6 +243,13 @@ function ajouterMessageVocal(pseudo, audioBase64) {
   span.className = "auteur";
   span.textContent = pseudo;
   div.appendChild(span);
+  const heure = formaterHeureFrance(date);
+  if (heure) {
+    const spanHeure = document.createElement("span");
+    spanHeure.className = "heure";
+    spanHeure.textContent = " " + heure;
+    div.appendChild(spanHeure);
+  }
   div.appendChild(document.createElement("br"));
 
   const audio = document.createElement("audio");
@@ -253,6 +265,16 @@ function escapeHtml(texte) {
   const div = document.createElement("div");
   div.textContent = texte;
   return div.innerHTML;
+}
+
+function formaterHeureFrance(isoString) {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  return date.toLocaleTimeString("fr-FR", {
+    timeZone: "Europe/Paris",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function connecterWebSocket() {
@@ -280,9 +302,9 @@ function connecterWebSocket() {
         if (msg.system) {
           ajouterMessageSystem(msg);
         } else if (msg.audio) {
-          ajouterMessageVocal(msg.pseudo, msg.audio);
+          ajouterMessageVocal(msg.pseudo, msg.audio, msg.date);
         } else {
-          ajouterMessage(msg.pseudo, msg.texte || "");
+          ajouterMessage(msg.pseudo, msg.texte || "", msg.date);
         }
       }
     } catch (e) {
