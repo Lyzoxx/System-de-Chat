@@ -1,6 +1,7 @@
 type Message = {
   id: number;
   pseudo: string;
+  date?: string;
   texte?: string;
   audio?: string;
   system?: boolean;
@@ -33,6 +34,7 @@ const server = Bun.serve({
       const message: Message = {
         id: nextId++,
         pseudo,
+        date: new Date().toISOString(),
         texte,
       };
       messages.push(message);
@@ -114,6 +116,7 @@ const server = Bun.serve({
           const message: Message = {
             id: nextId++,
             pseudo: newPseudo,
+            date: new Date().toISOString(),
             oldPseudo,
             texte: oldPseudo + " a modifié son pseudo en " + newPseudo,
             system: true,
@@ -134,6 +137,7 @@ const server = Bun.serve({
           const message: Message = {
             id: nextId++,
             pseudo,
+            date: new Date().toISOString(),
             texte: pseudo + " a rejoint",
             system: true,
           };
@@ -153,6 +157,7 @@ const server = Bun.serve({
           const message: Message = {
             id: nextId++,
             pseudo,
+            date: new Date().toISOString(),
             audio: payload.audio,
           };
           messages.push(message);
@@ -168,7 +173,8 @@ const server = Bun.serve({
         const message: Message = {
           id: nextId++,
           pseudo,
-          texte
+          date: new Date().toISOString(),
+          texte,
         };
 
 

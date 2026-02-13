@@ -113,6 +113,13 @@ h1 {
   margin-bottom: 4px;
 }
 
+#messages .message .heure {
+  font-weight: normal;
+  color: #666;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
 #messages .message-system {
   align-self: center;
   background: transparent;
@@ -120,6 +127,11 @@ h1 {
   font-size: 13px;
   font-style: italic;
   margin: 6px 0;
+}
+
+#messages .message-system .heure {
+  font-style: normal;
+  margin-left: 6px;
 }
 
 #envoiMessage {
