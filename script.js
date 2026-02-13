@@ -89,6 +89,39 @@ function ouvrirPopupPseudo() {
   popup.style.display = "flex";
 }
 
+async function inviter() {
+  const url = window.location.href;
+  const titre = "Rejoins le chat";
+  const texte = "Viens discuter avec moi sur le chat !";
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: titre,
+        text: texte,
+        url: url,
+      });
+    } catch (e) {
+      if (e.name !== "AbortError") {
+        copierLienEtAlerter(url);
+      }
+    }
+  } else {
+    copierLienEtAlerter(url);
+  }
+}
+
+function copierLienEtAlerter(url) {
+  navigator.clipboard
+    .writeText(url)
+    .then(() => {
+      alert("Lien copié ! Colle-le où tu veux pour inviter quelqu'un.");
+    })
+    .catch(() => {
+      prompt("Copie ce lien pour inviter quelqu'un :", url);
+    });
+}
+
 async function envoyerMessage() {
   const pseudo = localStorage.getItem("pseudo");
   if (!pseudo) {
