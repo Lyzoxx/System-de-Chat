@@ -1,12 +1,34 @@
 let socket;
 let mediaRecorder = null;
 let chunksVocal = [];
+let recaptchaWidgetId = null;
+
+window.onRecaptchaLoaded = function () {
+  const popup = document.getElementById("popup");
+  if (popup && popup.style.display !== "none") {
+    if (typeof grecaptcha !== "undefined" && grecaptcha.ready) {
+      grecaptcha.ready(afficherRecaptcha);
+    } else {
+      afficherRecaptcha();
+    }
+  }
+};
 
 window.onload = function () {
-  const pseudo = localStorage.getItem("pseudo");
-  if (pseudo) {
-    afficherPseudo(pseudo);
-    document.getElementById("popup").style.display = "none";
+  const savedPseudo = localStorage.getItem("pseudo");
+  if (savedPseudo) {
+    const input = document.getElementById("monInput");
+    if (input) input.value = savedPseudo;
+  }
+
+  document.getElementById("popup").style.display = "flex";
+
+  if (typeof grecaptcha !== "undefined" && grecaptcha.ready) {
+    grecaptcha.ready(function () {
+      afficherRecaptcha();
+    });
+  } else {
+    afficherRecaptcha();
   }
 
   connecterWebSocket();
@@ -39,24 +61,48 @@ async function validerPseudo() {
     return;
   }
 
+  const recaptchaToken = getRecaptchaToken();
+  const siteKey = (window.RECAPTCHA_SITE_KEY || "").trim();
+  if (siteKey && !recaptchaToken) {
+    if (errorEl) {
+      errorEl.textContent = "Veuillez valider le reCAPTCHA.";
+    } else {
+      alert("Veuillez valider le reCAPTCHA.");
+    }
+    return;
+  }
+
   try {
-    const response = await fetch(
-      "/check-pseudo?pseudo=" + encodeURIComponent(pseudo),
-    );
-    if (response.ok) {
-      const data = await response.json();
-      if (!data.available) {
-        if (errorEl) {
-          errorEl.textContent =
-            "Ce pseudo est déjà utilisé, choisis-en un autre.";
-        } else {
-          alert("Ce pseudo est déjà utilisé, choisis-en un autre.");
-        }
-        return;
+    const response = await fetch("/check-pseudo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pseudo, recaptchaToken }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const msg = data.error || "Erreur serveur";
+      if (errorEl) {
+        errorEl.textContent = msg;
+      } else {
+        alert(msg);
       }
+      return;
+    }
+    if (!data.available) {
+      if (errorEl) {
+        errorEl.textContent =
+          "Ce pseudo est déjà utilisé, choisis-en un autre.";
+      } else {
+        alert("Ce pseudo est déjà utilisé, choisis-en un autre.");
+      }
+      return;
     }
   } catch (e) {
     console.error("Erreur lors de la vérification du pseudo", e);
+    if (errorEl) {
+      errorEl.textContent = "Erreur de connexion au serveur.";
+    }
+    return;
   }
 
   const oldPseudo = localStorage.getItem("pseudo");
@@ -73,6 +119,62 @@ async function validerPseudo() {
       socket.send(JSON.stringify({ type: "join", pseudo }));
     }
   }
+
+  resetRecaptcha();
+}
+
+function afficherRecaptcha() {
+  const container = document.getElementById("recaptcha-container");
+  const btn = document.getElementById("btnValider");
+  const siteKey = (window.RECAPTCHA_SITE_KEY || "").trim();
+
+  if (!container || !siteKey) {
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  if (container.innerHTML.trim() !== "") return;
+
+  if (typeof grecaptcha === "undefined") {
+    setTimeout(afficherRecaptcha, 100);
+    return;
+  }
+
+  try {
+    recaptchaWidgetId = grecaptcha.render(container, {
+      sitekey: siteKey,
+      callback: function () {
+        const b = document.getElementById("btnValider");
+        if (b) b.disabled = false;
+      },
+    });
+  } catch (e) {
+    console.error("Erreur reCAPTCHA:", e);
+    if (btn) btn.disabled = false;
+  }
+}
+
+function initialiserRecaptcha() {
+  if (typeof grecaptcha !== "undefined" && grecaptcha.ready) {
+    grecaptcha.ready(afficherRecaptcha);
+  } else {
+    afficherRecaptcha();
+  }
+}
+
+function resetRecaptcha() {
+  const container = document.getElementById("recaptcha-container");
+  const btn = document.getElementById("btnValider");
+  const siteKey = (window.RECAPTCHA_SITE_KEY || "").trim();
+
+  if (container) container.innerHTML = "";
+  recaptchaWidgetId = null;
+  if (btn && siteKey) btn.disabled = true;
+}
+
+function getRecaptchaToken() {
+  if (typeof grecaptcha === "undefined" || recaptchaWidgetId == null) return "";
+  return grecaptcha.getResponse(recaptchaWidgetId) || "";
 }
 
 function afficherPseudo(pseudo) {
@@ -85,8 +187,13 @@ function ouvrirPopupPseudo() {
   const input = document.getElementById("monInput");
 
   input.value = "";
+  const err = document.getElementById("pseudoError");
+  if (err) err.textContent = "";
 
   popup.style.display = "flex";
+
+  resetRecaptcha();
+  initialiserRecaptcha();
 }
 
 async function inviter() {
@@ -318,10 +425,6 @@ function connecterWebSocket() {
 
   socket.onopen = function () {
     console.log("Connecté au serveur de chat (WebSocket).");
-    const pseudo = localStorage.getItem("pseudo");
-    if (pseudo) {
-      socket.send(JSON.stringify({ type: "join", pseudo }));
-    }
   };
 
   socket.onmessage = function (event) {

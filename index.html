@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Systeme de Chat</title>
     <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=explicit&onload=onRecaptchaLoaded" async defer></script>
   </head>
 
   <body>
@@ -32,8 +34,9 @@
         <h2>Entrez votre pseudo</h2>
         <input type="text" id="monInput" placeholder="Votre pseudo">
         <p id="pseudoError"></p>
+        <div id="recaptcha-container"></div>
         <br>
-        <button onclick="validerPseudo()">Valider</button>
+        <button id="btnValider" onclick="validerPseudo()" disabled>Valider</button>
       </div>
     </div>
 
