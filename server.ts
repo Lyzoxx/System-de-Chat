@@ -11,6 +11,14 @@ type Message = {
 const messages: Message[] = [];
 let nextId = 1;
 const pseudos = new Set<string>();
+const pseudoToToken = new Map<string, string>();
+
+const secret =
+        process.env.RECAPTCHA_SECRET_KEY;
+
+if (!secret) {
+  throw new Error("RECAPTCHA_SECRET_KEY is not set");
+}
 
 const server = Bun.serve({
   port: 3000,
@@ -48,7 +56,7 @@ const server = Bun.serve({
     }
 
     if (url.pathname === "/check-pseudo" && req.method === "POST") {
-      let data: { pseudo?: string; recaptchaToken?: string } = {};
+      let data: { pseudo?: string; recaptchaToken?: string; clientToken?: string } = {};
       try {
         data = (await req.json()) as typeof data;
       } catch {
@@ -60,33 +68,12 @@ const server = Bun.serve({
       const pseudo = typeof data.pseudo === "string" ? data.pseudo.trim() : "";
       const recaptchaToken =
         typeof data.recaptchaToken === "string" ? data.recaptchaToken : "";
+      const clientToken =
+        typeof data.clientToken === "string" ? data.clientToken : "";
 
-      const secret = process.env.RECAPTCHA_SECRET_KEY;
-      if (secret && recaptchaToken) {
-        const verifyRes = await fetch(
-          "https://www.google.com/recaptcha/api/siteverify",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              secret,
-              response: recaptchaToken,
-            }),
-          },
-        );
-        const verifyData = (await verifyRes.json()) as {
-          success?: boolean;
-        };
-        if (!verifyData.success) {
-          return new Response(
-            JSON.stringify({ available: false, error: "reCAPTCHA invalide" }),
-            {
-              status: 400,
-              headers: { "Content-Type": "application/json" },
-            },
-          );
-        }
-      } else if (secret) {
+
+      if (!recaptchaToken) {
+        console.log("[CHECK-PSEUDO] reCAPTCHA manquant");
         return new Response(
           JSON.stringify({
             available: false,
@@ -99,19 +86,72 @@ const server = Bun.serve({
         );
       }
 
-      const exists = pseudos.has(pseudo);
+      const verifyRes = await fetch(
+        "https://www.google.com/recaptcha/api/siteverify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            secret,
+            response: recaptchaToken,
+          }),
+        },
+      );
+      const verifyData = (await verifyRes.json()) as {
+        success?: boolean;
+        "error-codes"?: string[];
+      };
 
-      if (!exists && pseudo !== "") {
+      if (verifyData.success !== true) {
+        console.log("[CHECK-PSEUDO] reCAPTCHA invalide:", verifyData["error-codes"] || "inconnu");
+        return new Response(
+          JSON.stringify({ available: false, error: "reCAPTCHA invalide" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      console.log("[CHECK-PSEUDO] reCAPTCHA valide pour pseudo:", pseudo);
+
+      const exists = pseudos.has(pseudo);
+      const storedToken = pseudoToToken.get(pseudo);
+      const isReconnect = exists && storedToken && storedToken === clientToken;
+
+      if (isReconnect) {
+        return new Response(
+          JSON.stringify({ available: true, token: storedToken }),
+          { headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      if (exists) {
+        return new Response(
+          JSON.stringify({
+            available: false,
+            error: "Ce pseudo est déjà utilisé, choisis-en un autre.",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (pseudo !== "") {
         pseudos.add(pseudo);
+        const token = crypto.randomUUID();
+        pseudoToToken.set(pseudo, token);
+        return new Response(
+          JSON.stringify({ available: true, token }),
+          { headers: { "Content-Type": "application/json" } },
+        );
       }
 
       return new Response(
-        JSON.stringify({
-          available: !exists,
-        }),
-        {
-          headers: { "Content-Type": "application/json" },
-        },
+        JSON.stringify({ available: false, error: "Pseudo requis" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
 
@@ -178,7 +218,11 @@ const server = Bun.serve({
           };
           messages.push(message);
           pseudos.delete(oldPseudo);
+          pseudoToToken.delete(oldPseudo);
           pseudos.add(newPseudo);
+          const newToken = crypto.randomUUID();
+          pseudoToToken.set(newPseudo, newToken);
+          ws.send(JSON.stringify({ type: "pseudoToken", token: newToken }));
           console.log(`[CHANGE PSEUDO] ${oldPseudo} → ${newPseudo}`);
           server.publish(
             "chat",

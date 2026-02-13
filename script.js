@@ -73,10 +73,11 @@ async function validerPseudo() {
   }
 
   try {
+    const clientToken = localStorage.getItem("pseudoToken") || "";
     const response = await fetch("/check-pseudo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pseudo, recaptchaToken }),
+      body: JSON.stringify({ pseudo, recaptchaToken, clientToken }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -91,11 +92,15 @@ async function validerPseudo() {
     if (!data.available) {
       if (errorEl) {
         errorEl.textContent =
-          "Ce pseudo est déjà utilisé, choisis-en un autre.";
+          data.error || "Ce pseudo est déjà utilisé, choisis-en un autre.";
       } else {
-        alert("Ce pseudo est déjà utilisé, choisis-en un autre.");
+        alert(data.error || "Ce pseudo est déjà utilisé, choisis-en un autre.");
       }
       return;
+    }
+
+    if (data.token) {
+      localStorage.setItem("pseudoToken", data.token);
     }
   } catch (e) {
     console.error("Erreur lors de la vérification du pseudo", e);
@@ -433,6 +438,8 @@ function connecterWebSocket() {
 
       if (data.type === "history" && Array.isArray(data.messages)) {
         afficherListeMessages(data.messages);
+      } else if (data.type === "pseudoToken" && data.token) {
+        localStorage.setItem("pseudoToken", data.token);
       } else if (data.type === "message" && data.message) {
         const msg = data.message;
         if (msg.system) {
