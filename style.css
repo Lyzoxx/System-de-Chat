@@ -45,6 +45,24 @@ h1 {
   }
 }
 
+#btnInviter {
+  position: fixed;
+  top: 10px;
+  left: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+#btnInviter:hover {
+  background: #1d4ed8;
+}
+
 #pseudoBloc {
   position: fixed;
   top: 10px;
