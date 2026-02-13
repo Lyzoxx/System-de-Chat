@@ -47,11 +47,61 @@ const server = Bun.serve({
       return new Response("Message reçu par le serveur");
     }
 
-    if (url.pathname === "/check-pseudo" && req.method === "GET") {
-      const pseudo = url.searchParams.get("pseudo") ?? "";
+    if (url.pathname === "/check-pseudo" && req.method === "POST") {
+      let data: { pseudo?: string; recaptchaToken?: string } = {};
+      try {
+        data = (await req.json()) as typeof data;
+      } catch {
+        return new Response(
+          JSON.stringify({ available: false, error: "Requête invalide" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      const pseudo = typeof data.pseudo === "string" ? data.pseudo.trim() : "";
+      const recaptchaToken =
+        typeof data.recaptchaToken === "string" ? data.recaptchaToken : "";
+
+      const secret = process.env.RECAPTCHA_SECRET_KEY;
+      if (secret && recaptchaToken) {
+        const verifyRes = await fetch(
+          "https://www.google.com/recaptcha/api/siteverify",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              secret,
+              response: recaptchaToken,
+            }),
+          },
+        );
+        const verifyData = (await verifyRes.json()) as {
+          success?: boolean;
+        };
+        if (!verifyData.success) {
+          return new Response(
+            JSON.stringify({ available: false, error: "reCAPTCHA invalide" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+      } else if (secret) {
+        return new Response(
+          JSON.stringify({
+            available: false,
+            error: "Veuillez valider le reCAPTCHA",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
       const exists = pseudos.has(pseudo);
 
-      if (!exists && pseudo.trim() !== "") {
+      if (!exists && pseudo !== "") {
         pseudos.add(pseudo);
       }
 
@@ -74,6 +124,11 @@ const server = Bun.serve({
     if (url.pathname === "/style.css") {
       return new Response(Bun.file("style.css"), {
         headers: { "Content-Type": "text/css" },
+      });
+    }
+    if (url.pathname === "/config.js") {
+      return new Response(Bun.file("config.js"), {
+        headers: { "Content-Type": "application/javascript" },
       });
     }
     if (url.pathname === "/script.js") {
