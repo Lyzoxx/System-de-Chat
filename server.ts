@@ -14,14 +14,21 @@ const pseudos = new Set<string>();
 const pseudoToToken = new Map<string, string>();
 
 const secret =
-        process.env.RECAPTCHA_SECRET_KEY;
+  (typeof process.env.RECAPTCHA_SECRET_KEY === "string" && process.env.RECAPTCHA_SECRET_KEY.trim())
+  ? process.env.RECAPTCHA_SECRET_KEY.trim()
+  : "";
+
+const siteKey =
+  (typeof process.env.RECAPTCHA_SITE_KEY === "string" && process.env.RECAPTCHA_SITE_KEY.trim())
+  ? process.env.RECAPTCHA_SITE_KEY.trim()
+  : "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
 
 if (!secret) {
   throw new Error("RECAPTCHA_SECRET_KEY is not set");
 }
 
 const server = Bun.serve({
-  port: 3000,
+  port: 3001,
 
   async fetch(req, server) {
     const url = new URL(req.url);
@@ -167,7 +174,8 @@ const server = Bun.serve({
       });
     }
     if (url.pathname === "/config.js") {
-      return new Response(Bun.file("config.js"), {
+      const js = `window.RECAPTCHA_SITE_KEY = ${JSON.stringify(siteKey)};`;
+      return new Response(js, {
         headers: { "Content-Type": "application/javascript" },
       });
     }
@@ -291,5 +299,5 @@ const server = Bun.serve({
   },
 });
 
-console.log("Serveur lancé sur http://localhost:3000");
+console.log("Serveur lancé sur http://localhost:3001");
 

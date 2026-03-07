@@ -8,7 +8,7 @@ RUN bun install
 
 COPY . .
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["bun", "server.ts"]
 
